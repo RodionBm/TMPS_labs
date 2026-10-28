@@ -6,7 +6,7 @@
 - **Faculty:** FCIM, UTM
 
 > **Laboratory Work #2 — Design Patterns.**  
-> This report extends the codebase delivered in *Laboratory Work #1* (Bakery Management System) with three classic design patterns: **Singleton**, **Builder**, and **Factory Method**.
+> This report extends the codebase delivered in *Laboratory Work #1* (Bakery Management System) with three classic design patterns: **Singleton**, **Builder**, and **Factory Method**. All customer data is now read **interactively from the keyboard** using `java.util.Scanner`, with full input validation.
 
 ---
 
@@ -39,7 +39,9 @@ This report presents the second iteration of a small bakery management system wr
 - **Builder** — step-by-step construction of complex `CustomerOrder` objects.
 - **Factory Method** — centralized creation of payment processors.
 
-The program still simulates a typical bakery day: baking bread, managing inventory, ordering supplies, serving customers with different payment methods, and cleaning the bakery. The patterns are applied because they address concrete pain points that arose in the Lab 1 code (hard-coded configuration, constructor telescoping, scattered `new` calls) — not for their own sake.
+The program simulates a typical bakery day: baking bread, managing inventory, ordering supplies, serving customers with different payment methods, and cleaning the bakery. The patterns are applied because they address concrete pain points that arose in the Lab 1 code (hard-coded configuration, constructor telescoping, scattered `new` calls) — not for their own sake.
+
+Additionally, the program is now **interactive**: all customer data (name, items, discount, note, delivery, payment type) is read from the keyboard using `java.util.Scanner`. Every input is validated so the program never crashes on malformed data.
 
 The **Strategy** pattern introduced in Lab 1 (the `PaymentProcessor` abstraction injected into `CustomerService`) is kept as-is and now coexists with the factory, showing how multiple patterns compose in one small codebase.
 
@@ -59,6 +61,10 @@ The system must continue to:
 5. Accept payments via multiple methods and remain **open for extension** when new methods are added.
 6. Be easy to test and maintain.
 
+New in Lab 2:
+
+7. **Accept customer orders and payment choices interactively from the keyboard**, validating every input (non-empty names, integer ranges, recognized payment types) before using it.
+
 ---
 
 ## 3. Design
@@ -73,7 +79,7 @@ The system is composed of **independent, single-purpose components**:
 - **`PaymentProcessorFactory`** — *new in Lab 2* — the single place that constructs concrete payment processors.
 - **`BakeryConfig`** — *new in Lab 2* — a singleton exposing the bakery name, currency, and tax rate.
 - **`CustomerOrder` with nested `CustomerOrder.Builder`** — *new in Lab 2* — an immutable order constructed fluently.
-- One entry point: `Main`, which wires all components together.
+- One entry point: `Main`, which wires all components together and reads input from the user via `Scanner`.
 
 The design avoids conditional branching for payment handling inside `CustomerService`. Instead, the service depends on the `PaymentProcessor` abstraction and receives a concrete processor via its constructor. New payment methods are added by extending `PaymentProcessor` and registering them in the factory — without touching `CustomerService`.
 
@@ -113,7 +119,7 @@ digraph BakeryUML {
     SupplyOrder      [label="{SupplyOrder|\l|+ orderSupplies(): void\l}"];
     BakeryCleaner    [label="{BakeryCleaner|\l|+ cleanBakery(): void\l}"];
 
-    Main [shape=box, fillcolor="#ead1dc", label="Main\n+ main(args: String[]): void"];
+    Main [shape=box, fillcolor="#ead1dc", label="Main\n+ main(args: String[]): void\n- readOrder(): CustomerOrder\n- readPaymentType(): String\n- readInt(...): int\n- readYesNo(...): String"];
 
     CreditCardPaymentProcessor -> PaymentProcessor [arrowhead=onormal];
     PayPalPaymentProcessor     -> PaymentProcessor [arrowhead=onormal];
@@ -134,7 +140,7 @@ digraph BakeryUML {
     Main -> BakeryConfig             [style=dotted, arrowhead=vee];
 }
 ```
-<img width="1447" height="488" alt="image" src="https://github.com/user-attachments/assets/96f8744b-8c6a-4392-8544-a695b0042b75" />
+<img width="1447" height="488" alt="image" src="https://github.com/user-attachments/assets/409e9da9-6dc7-4b82-a941-7fcddfc132ab" />
 
 **Figure 1:** UML class diagram of the Bakery Management System (Lab 2).
 
@@ -178,6 +184,7 @@ Key points:
 - All product fields are `final`, so a built order cannot be modified.
 - The builder is a **static nested class**, keeping it close to its product.
 - Only `customerName` is required; everything else is optional.
+- In `Main`, each answer the user gives is applied to the builder via a fluent call (`addItem`, `discount`, `note`, `withDelivery`), and `.build()` is called once at the end — a clean separation between *collecting input* and *constructing the product*.
 
 #### 3.3.3 Factory Method — `PaymentProcessorFactory`
 
@@ -188,6 +195,7 @@ Key points:
 - Callers (`Main`, `CustomerService`) never reference concrete processor classes — only the `PaymentProcessor` abstraction and the factory.
 - Adding a new payment method requires adding one `case` — the rest of the system is untouched.
 - Invalid types fail fast with a clear exception instead of returning `null`.
+- In `Main`, the payment type the user types is passed directly to `PaymentProcessorFactory.create(type)` — `Main` never names a concrete processor class.
 
 #### 3.3.4 Supporting pattern — Strategy (from Lab 1)
 
@@ -202,7 +210,7 @@ Lab 2 does **not** discard Lab 1 — it builds on it. The table below shows what
 | `PaymentProcessor` + 2 subclasses | Present (Strategy) | Unchanged |
 | `CustomerService` | Present (Strategy, DIP) | Unchanged signature; now accepts `CustomerOrder` instead of a raw `double` |
 | `BreadBaker`, `InventoryManager`, `SupplyOrder`, `BakeryCleaner` | Present (SRP) | Unchanged |
-| `Main` | Direct `new` for payment processors | Uses `PaymentProcessorFactory` |
+| `Main` | Direct `new` for payment processors; hard-coded data | Uses `PaymentProcessorFactory`; reads all data from the keyboard via `Scanner` |
 | `PaymentProcessorFactory` | — | **New** (Factory Method) |
 | `BakeryConfig` | — | **New** (Singleton) |
 | `CustomerOrder` + `Builder` | — | **New** (Builder) |
@@ -229,11 +237,12 @@ The whole program is intentionally kept in a single `Main.java` file (Java 8 com
 
 ### 4.2 Source Code
 
-**`Main.java`** (complete, Java 8 compatible):
+**`Main.java`** (complete, Java 8 compatible, interactive):
 
 ```java
 import java.util.*;
 
+// ---------- 1. SINGLETON ----------
 class BakeryConfig {
     private static BakeryConfig instance;
     private final String bakeryName;
@@ -253,6 +262,7 @@ class BakeryConfig {
     public double getTaxRate()    { return taxRate; }
 }
 
+// ---------- 2. FACTORY METHOD ----------
 abstract class PaymentProcessor {
     public abstract void processPayment(double amount);
 }
@@ -270,6 +280,8 @@ class PaymentProcessorFactory {
     public static PaymentProcessor create(String type) {
         switch (type.toLowerCase()) {
             case "creditcard":
+            case "credit":
+            case "card":
                 return new CreditCardPaymentProcessor();
             case "paypal":
                 return new PayPalPaymentProcessor();
@@ -280,6 +292,7 @@ class PaymentProcessorFactory {
     }
 }
 
+// ---------- 3. BUILDER ----------
 class CustomerOrder {
     private final String customerName;
     private final List<String> items;
@@ -325,6 +338,7 @@ class CustomerOrder {
     }
 }
 
+// ---------- Bakery roles ----------
 class BreadBaker {
     public void bakeBread() { System.out.println("Baking high-quality bread..."); }
 }
@@ -338,6 +352,7 @@ class BakeryCleaner {
     public void cleanBakery() { System.out.println("Cleaning the bakery..."); }
 }
 
+// ---------- Strategy service ----------
 class CustomerService {
     private final PaymentProcessor paymentProcessor;
     public CustomerService(PaymentProcessor paymentProcessor) {
@@ -349,7 +364,11 @@ class CustomerService {
     }
 }
 
+// ---------- MAIN ----------
 public class Main {
+
+    private static final Scanner sc = new Scanner(System.in);
+
     public static void main(String[] args) {
         BakeryConfig config = BakeryConfig.getInstance();
         System.out.println("Welcome to " + config.getBakeryName() +
@@ -360,27 +379,94 @@ public class Main {
         new InventoryManager().manageInventory();
         new SupplyOrder().orderSupplies();
 
-        CustomerOrder order1 = new CustomerOrder.Builder("Alice")
-                .addItem("Sourdough")
-                .addItem("Croissant")
-                .discount(10)
-                .note("No nuts")
-                .withDelivery()
-                .build();
+        int numberOfOrders = readInt("How many customer orders? ", 1, 100);
 
-        CustomerService ccService = new CustomerService(
-                PaymentProcessorFactory.create("creditcard"));
-        ccService.serveCustomer(order1);
+        for (int i = 1; i <= numberOfOrders; i++) {
+            System.out.println("\n=== Order #" + i + " ===");
+            CustomerOrder order = readOrder();
 
-        new BakeryCleaner().cleanBakery();
+            String payType = readPaymentType();
+            PaymentProcessor processor = PaymentProcessorFactory.create(payType);
 
-        CustomerOrder order2 = new CustomerOrder.Builder("Bob")
-                .addItem("Baguette")
-                .build();
-        System.out.println("\nNew customer pays with PayPal...");
-        CustomerService ppService = new CustomerService(
-                PaymentProcessorFactory.create("paypal"));
-        ppService.serveCustomer(order2);
+            CustomerService service = new CustomerService(processor);
+            service.serveCustomer(order);
+
+            new BakeryCleaner().cleanBakery();
+        }
+
+        System.out.println("\nAll orders processed. Have a nice day!");
+        sc.close();
+    }
+
+    private static CustomerOrder readOrder() {
+        System.out.print("Customer name: ");
+        String name = sc.nextLine().trim();
+        while (name.isEmpty()) {
+            System.out.print("Name cannot be empty. Customer name: ");
+            name = sc.nextLine().trim();
+        }
+
+        CustomerOrder.Builder builder = new CustomerOrder.Builder(name);
+
+        int itemCount = readInt("How many items? ", 1, 50);
+        for (int j = 1; j <= itemCount; j++) {
+            System.out.print("  Item #" + j + ": ");
+            String item = sc.nextLine().trim();
+            while (item.isEmpty()) {
+                System.out.print("  Item cannot be empty. Item #" + j + ": ");
+                item = sc.nextLine().trim();
+            }
+            builder.addItem(item);
+        }
+
+        int discount = readInt("Discount percent (0-100): ", 0, 100);
+        if (discount > 0) builder.discount(discount);
+
+        System.out.print("Special note (leave empty for none): ");
+        String note = sc.nextLine().trim();
+        if (!note.isEmpty()) builder.note(note);
+
+        String delivery = readYesNo("Delivery? (y/n): ");
+        if (delivery.equalsIgnoreCase("y")) builder.withDelivery();
+
+        return builder.build();
+    }
+
+    private static String readPaymentType() {
+        while (true) {
+            System.out.print("Payment type (creditcard / paypal): ");
+            String type = sc.nextLine().trim().toLowerCase();
+            if (type.equals("creditcard") || type.equals("credit")
+                    || type.equals("card")
+                    || type.equals("paypal")) {
+                return type;
+            }
+            System.out.println("  Invalid type. Try 'creditcard' or 'paypal'.");
+        }
+    }
+
+    private static int readInt(String prompt, int min, int max) {
+        while (true) {
+            System.out.print(prompt);
+            String line = sc.nextLine().trim();
+            try {
+                int value = Integer.parseInt(line);
+                if (value >= min && value <= max) return value;
+                System.out.println("  Please enter a number between "
+                        + min + " and " + max + ".");
+            } catch (NumberFormatException e) {
+                System.out.println("  Not a valid integer. Try again.");
+            }
+        }
+    }
+
+    private static String readYesNo(String prompt) {
+        while (true) {
+            System.out.print(prompt);
+            String line = sc.nextLine().trim().toLowerCase();
+            if (line.equals("y") || line.equals("n")) return line;
+            System.out.println("  Please enter 'y' or 'n'.");
+        }
     }
 }
 ```
@@ -393,6 +479,8 @@ public class Main {
 javac --release 8 Main.java
 java Main
 ```
+
+The program is **interactive** — after launching it, follow the on-screen prompts to enter customer names, items, discount, note, delivery choice, and payment type. Input is validated: invalid numbers, empty names, or unknown payment types cause the program to re-ask instead of crashing.
 
 Optional — regenerate the UML diagram:
 
@@ -409,13 +497,34 @@ Welcome to Sweet Crumb Bakery (currency=USD, tax=8.0%)
 Baking high-quality bread...
 Managing inventory...
 Ordering supplies...
+How many customer orders? 2
+
+=== Order #1 ===
+Customer name: Alice
+How many items? 2
+  Item #1: Sourdough
+  Item #2: Croissant
+Discount percent (0-100): 10
+Special note (leave empty for none): No nuts
+Delivery? (y/n): y
+Payment type (creditcard / paypal): creditcard
 Serving customer Order for Alice | items=[Sourdough, Croissant] | discount=10.0% | note='No nuts' | delivery=true | total=$17.22
 Processing credit card payment of $17.22
 Cleaning the bakery...
 
-New customer pays with PayPal...
+=== Order #2 ===
+Customer name: Bob
+How many items? 1
+  Item #1: Baguette
+Discount percent (0-100): 0
+Special note (leave empty for none): 
+Delivery? (y/n): n
+Payment type (creditcard / paypal): paypal
 Serving customer Order for Bob | items=[Baguette] | discount=0.0% | note='' | delivery=false | total=$5.4
 Processing PayPal payment of $5.4
+Cleaning the bakery...
+
+All orders processed. Have a nice day!
 ```
 
 ---
@@ -434,7 +543,7 @@ class CryptoPaymentProcessor extends PaymentProcessor {
 // case "crypto": return new CryptoPaymentProcessor();
 ```
 
-Only one new class + one `case` — everything else untouched.
+Then the user can type `crypto` at the payment prompt — no other change needed. Only one new class + one `case`; everything else untouched.
 
 ### 6.2 New order attribute (Builder)
 
@@ -444,11 +553,15 @@ private boolean giftWrap = false;
 public Builder giftWrap() { this.giftWrap = true; return this; }
 ```
 
-Existing callers compile and behave unchanged; new callers opt in fluently.
+Existing callers compile and behave unchanged; new callers opt in fluently. In `Main`, add a `readYesNo("Gift wrap? (y/n): ")` question and call `builder.giftWrap()` if the answer is `y`.
 
 ### 6.3 New bakery-wide setting (Singleton)
 
 Add a `final` field to `BakeryConfig`'s private constructor and a getter. Because all consumers go through `getInstance()`, they immediately see the new value without any code change on their side.
+
+### 6.4 New validation rule (input layer)
+
+Add a new helper method in `Main` (e.g. `readNonEmptyString(prompt)`) and call it wherever a non-empty string is required. The patterns are unaffected — this only touches the input layer.
 
 ---
 
@@ -462,7 +575,9 @@ Laboratory Work #2 extended the Lab 1 codebase with three design patterns, each 
 
 The **Strategy** pattern from Lab 1 is preserved and now complements the factory: the factory decides *what* to create, the injected abstraction decides *how* `CustomerService` uses it. Together the patterns keep the program open for extension while keeping each class small and testable.
 
-Comparing the two labs: Lab 1 taught *why* classes should be small and depend on abstractions (SOLID); Lab 2 shows *how* to instantiate and assemble those abstractions cleanly as the program grows (patterns). Neither lab works as well without the other.
+Additionally, the program now accepts **interactive keyboard input** via `java.util.Scanner`, with validation loops (`while`) and exception handling (`try/catch` on `Integer.parseInt`) so that malformed input is rejected gracefully. This does not change the pattern structure — only `main()` and its helper methods — demonstrating that the design remains stable under changes to the entry point.
+
+Comparing the two labs: Lab 1 taught *why* classes should be small and depend on abstractions (SOLID); Lab 2 shows *how* to instantiate and assemble those abstractions cleanly as the program grows (patterns) and how to feed them real, user-supplied data. Neither lab works as well without the other.
 
 ---
 
@@ -471,7 +586,8 @@ Comparing the two labs: Lab 1 taught *why* classes should be small and depend on
 1. Gamma, E., Helm, R., Johnson, R., & Vlissides, J. (1994). *Design Patterns: Elements of Reusable Object-Oriented Software*. Addison-Wesley.
 2. Martin, R. C. (2017). *Clean Architecture: A Craftsman's Guide to Software Structure and Design*. Prentice Hall.
 3. Oracle. *The Java Tutorials — Object-Oriented Programming Concepts*. https://docs.oracle.com/javase/tutorial/java/concepts/
-4. Graphviz Documentation. https://graphviz.org/documentation/
+4. Oracle. *Java API — java.util.Scanner*. https://docs.oracle.com/javase/8/docs/api/java/util/Scanner.html
+5. Graphviz Documentation. https://graphviz.org/documentation/
 
 ---
 
