@@ -1,6 +1,7 @@
 import java.util.*;
 
-class BakeryConfig {
+class BakeryConfig 
+{
     private static BakeryConfig instance;
     private final String bakeryName;
     private final String currency;
@@ -15,10 +16,11 @@ class BakeryConfig {
     
     public static synchronized BakeryConfig getInstance() 
     {
-        if (instance == null) instance = new BakeryConfig();
+        if (instance == null) 
+            instance = new BakeryConfig();
         return instance;
     }
-    
+
     public String getBakeryName() 
     { 
         return bakeryName; 
@@ -63,6 +65,8 @@ class PaymentProcessorFactory
         switch (type.toLowerCase()) 
         {
             case "creditcard":
+            case "credit":
+            case "card":
                 return new CreditCardPaymentProcessor();
             case "paypal":
                 return new PayPalPaymentProcessor();
@@ -97,36 +101,26 @@ class CustomerOrder
         private double discountPercent = 0.0;
         private String specialNote = "";
         private boolean delivery = false;
-
         public Builder(String customerName) 
         { 
             this.customerName = customerName; 
         }
-        
         public Builder addItem(String item) 
         { 
-            items.add(item); 
-            return this; 
+            items.add(item); return this; 
         }
-        
         public Builder discount(double p)   
         { 
-            this.discountPercent = p; 
-            return this; 
+            this.discountPercent = p; return this;
         }
-        
         public Builder note(String n)       
         { 
-            this.specialNote = n; 
-            return this; 
+            this.specialNote = n; return this; 
         }
-        
         public Builder withDelivery()       
         { 
-            this.delivery = true; 
-            return this; 
+            this.delivery = true; return this; 
         }
-
         public CustomerOrder build()        
         { 
             return new CustomerOrder(this); 
@@ -154,7 +148,7 @@ class BreadBaker
 {
     public void bakeBread() 
     { 
-        System.out.println("Baking high-quality bread...");  
+        System.out.println("Baking high-quality bread..."); 
     }
 }
 
@@ -162,7 +156,7 @@ class InventoryManager
 {
     public void manageInventory() 
     { 
-        System.out.println("Managing inventory...");
+        System.out.println("Managing inventory..."); 
     }
 }
 
@@ -185,12 +179,12 @@ class BakeryCleaner
 class CustomerService 
 {
     private final PaymentProcessor paymentProcessor;
-
+    
     public CustomerService(PaymentProcessor paymentProcessor) 
     {
         this.paymentProcessor = paymentProcessor;
     }
-
+    
     public void serveCustomer(CustomerOrder order) 
     {
         System.out.println("Serving customer " + order);
@@ -200,6 +194,9 @@ class CustomerService
 
 public class Main 
 {
+
+    private static final Scanner sc = new Scanner(System.in);
+
     public static void main(String[] args) 
     {
         BakeryConfig config = BakeryConfig.getInstance();
@@ -209,23 +206,102 @@ public class Main
         new BreadBaker().bakeBread();
         new InventoryManager().manageInventory();
         new SupplyOrder().orderSupplies();
-        CustomerOrder order1 = new CustomerOrder.Builder("Alice")
-                .addItem("Sourdough")
-                .addItem("Croissant")
-                .discount(10)
-                .note("No nuts")
-                .withDelivery()
-                .build();
-        CustomerService ccService = new CustomerService(
-                PaymentProcessorFactory.create("creditcard"));
-        ccService.serveCustomer(order1);
-        new BakeryCleaner().cleanBakery();
-        CustomerOrder order2 = new CustomerOrder.Builder("Bob")
-                .addItem("Baguette")
-                .build();
-        System.out.println("\nNew customer pays with PayPal...");
-        CustomerService ppService = new CustomerService(
-                PaymentProcessorFactory.create("paypal"));
-        ppService.serveCustomer(order2);
+        int numberOfOrders = readInt("How many customer orders? ", 1, 100);
+        for (int i = 1; i <= numberOfOrders; i++) 
+        {
+            System.out.println("\n=== Order #" + i + " ===");
+            CustomerOrder order = readOrder();
+            String payType = readPaymentType();
+            PaymentProcessor processor = PaymentProcessorFactory.create(payType);
+            CustomerService service = new CustomerService(processor);
+            service.serveCustomer(order);
+            new BakeryCleaner().cleanBakery();
+        }
+        System.out.println("\nAll orders processed. Have a nice day!");
+        sc.close();
+    }
+
+    private static CustomerOrder readOrder() 
+    {
+        System.out.print("Customer name: ");
+        String name = sc.nextLine().trim();
+        while (name.isEmpty()) 
+        {
+            System.out.print("Name cannot be empty. Customer name: ");
+            name = sc.nextLine().trim();
+        }
+        CustomerOrder.Builder builder = new CustomerOrder.Builder(name);
+        int itemCount = readInt("How many items? ", 1, 50);
+        for (int j = 1; j <= itemCount; j++) 
+        {
+            System.out.print("  Item #" + j + ": ");
+            String item = sc.nextLine().trim();
+            while (item.isEmpty()) 
+            {
+                System.out.print("  Item cannot be empty. Item #" + j + ": ");
+                item = sc.nextLine().trim();
+            }
+            builder.addItem(item);
+        }
+        int discount = readInt("Discount percent (0-100): ", 0, 100);
+        if (discount > 0) 
+            builder.discount(discount);
+        System.out.print("Special note (leave empty for none): ");
+        String note = sc.nextLine().trim();
+        if (!note.isEmpty())
+            builder.note(note);
+        String delivery = readYesNo("Delivery? (y/n): ");
+        if (delivery.equalsIgnoreCase("y")) 
+            builder.withDelivery();
+        return builder.build();
+    }
+
+    private static String readPaymentType() 
+    {
+        while (true) 
+        {
+            System.out.print("Payment type (creditcard / paypal): ");
+            String type = sc.nextLine().trim().toLowerCase();
+            if (type.equals("creditcard") || type.equals("credit")
+                    || type.equals("card")
+                    || type.equals("paypal")) 
+            {
+                return type;
+            }
+            System.out.println("  Invalid type. Try 'creditcard' or 'paypal'.");
+        }
+    }
+
+    private static int readInt(String prompt, int min, int max) 
+    {
+        while (true) 
+        {
+            System.out.print(prompt);
+            String line = sc.nextLine().trim();
+            try 
+            {
+                int value = Integer.parseInt(line);
+                if (value >= min && value <= max) 
+                    return value;
+                System.out.println("  Please enter a number between "
+                        + min + " and " + max + ".");
+            } 
+            catch (NumberFormatException e) 
+            {
+                System.out.println("  Not a valid integer. Try again.");
+            }
+        }
+    }
+
+    private static String readYesNo(String prompt) 
+    {
+        while (true) 
+        {
+            System.out.print(prompt);
+            String line = sc.nextLine().trim().toLowerCase();
+            if (line.equals("y") || line.equals("n")) 
+                return line;
+            System.out.println("  Please enter 'y' or 'n'.");
+        }
     }
 }
