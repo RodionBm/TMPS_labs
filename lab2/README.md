@@ -6,7 +6,7 @@
 - **Faculty:** FCIM, UTM
 
 > **Laboratory Work #2 — Design Patterns.**  
-> This report extends the codebase delivered in *Laboratory Work #1* (Bakery Management System) with three classic design patterns: **Singleton**, **Builder**, and **Factory Method**. All customer data is now read **interactively from the keyboard** using `java.util.Scanner`, with full input validation.
+> This report extends the codebase delivered in *Laboratory Work #1* (Bakery Management System) with three classic design patterns: **Singleton**, **Builder**, and **Factory Method**. The **Strategy** pattern from Lab 1 is preserved and now coexists with the factory. All customer data is read **interactively from the keyboard** using `java.util.Scanner`, with full input validation.
 
 ---
 
@@ -16,9 +16,10 @@
 - [2. Problem Statement](#2-problem-statement)
 - [3. Design](#3-design)
   - [3.1 Overview](#31-overview)
-  - [3.2 UML Class Diagram](#32-uml-class-diagram)
-  - [3.3 Design Rationale](#33-design-rationale)
-  - [3.4 Relationship to Laboratory Work #1](#34-relationship-to-laboratory-work-1)
+  - [3.2 UML Class Diagram — Full System](#32-uml-class-diagram--full-system)
+  - [3.3 UML Diagram per Pattern](#33-uml-diagram-per-pattern)
+  - [3.4 Design Rationale](#34-design-rationale)
+  - [3.5 Relationship to Laboratory Work #1](#35-relationship-to-laboratory-work-1)
 - [4. Implementation](#4-implementation)
   - [4.1 Project Structure](#41-project-structure)
   - [4.2 Source Code](#42-source-code)
@@ -44,6 +45,8 @@ The program simulates a typical bakery day: baking bread, managing inventory, or
 Additionally, the program is now **interactive**: all customer data (name, items, discount, note, delivery, payment type) is read from the keyboard using `java.util.Scanner`. Every input is validated so the program never crashes on malformed data.
 
 The **Strategy** pattern introduced in Lab 1 (the `PaymentProcessor` abstraction injected into `CustomerService`) is kept as-is and now coexists with the factory, showing how multiple patterns compose in one small codebase.
+
+**Pattern count:** 3 new patterns (Singleton, Builder, Factory Method) + 1 inherited pattern (Strategy) = **4 patterns total**.
 
 ---
 
@@ -83,68 +86,15 @@ The system is composed of **independent, single-purpose components**:
 
 The design avoids conditional branching for payment handling inside `CustomerService`. Instead, the service depends on the `PaymentProcessor` abstraction and receives a concrete processor via its constructor. New payment methods are added by extending `PaymentProcessor` and registering them in the factory — without touching `CustomerService`.
 
-### 3.2 UML Class Diagram
+### 3.2 UML Class Diagram — Full System
 
-Figure 1 shows the class structure of the system, color-coded by pattern role.
+Figure 1 shows the complete class structure, color-coded by pattern role.
 
-```dot
-digraph BakeryUML {
-    graph [rankdir=TB, fontname="Helvetica", nodesep=0.5, ranksep=0.7, splines=ortho];
-    node  [shape=record, fontname="Helvetica", fontsize=10, style="filled", fillcolor="#f7f7f7"];
-    edge  [fontname="Helvetica", fontsize=9, color="#444444"];
+<img width="1283" height="539" alt="Full UML class diagram" src="docs/bakery-uml.png" />
 
-    PaymentProcessor [fillcolor="#e8eef7",
-        label="{«abstract»\nPaymentProcessor|\l|+ processPayment(amount: double): void\l}"];
-    CreditCardPaymentProcessor [fillcolor="#dbe5f1",
-        label="{CreditCardPaymentProcessor|\l|+ processPayment(amount: double): void\l}"];
-    PayPalPaymentProcessor [fillcolor="#dbe5f1",
-        label="{PayPalPaymentProcessor|\l|+ processPayment(amount: double): void\l}"];
+**Figure 1:** Full UML class diagram of the Bakery Management System (Lab 2).
 
-    PaymentProcessorFactory [fillcolor="#fff2cc",
-        label="{PaymentProcessorFactory|\l|{static} create(type: String): PaymentProcessor\l}"];
-
-    BakeryConfig [fillcolor="#d9ead3",
-        label="{«singleton»\nBakeryConfig|\l- {static} instance: BakeryConfig\l- bakeryName: String\l- currency: String\l- taxRate: double\l|+ {static} getInstance(): BakeryConfig\l+ getBakeryName(): String\l+ getCurrency(): String\l+ getTaxRate(): double\l}"];
-
-    CustomerOrder [fillcolor="#fce5cd",
-        label="{CustomerOrder|\l- customerName: String\l- items: List<String>\l- discountPercent: double\l- specialNote: String\l- delivery: boolean\l|+ calculateTotal(): double\l+ toString(): String\l}"];
-    CustomerOrderBuilder [fillcolor="#fce5cd",
-        label="{«builder»\nCustomerOrder.Builder|\l- customerName: String\l- items: List<String>\l- discountPercent: double\l- specialNote: String\l- delivery: boolean\l|+ Builder(name: String)\l+ addItem(item: String): Builder\l+ discount(p: double): Builder\l+ note(n: String): Builder\l+ withDelivery(): Builder\l+ build(): CustomerOrder\l}"];
-
-    CustomerService [fillcolor="#dbe5f1",
-        label="{CustomerService|\l- paymentProcessor: PaymentProcessor\l|+ CustomerService(p: PaymentProcessor)\l+ serveCustomer(order: CustomerOrder): void\l}"];
-
-    BreadBaker       [label="{BreadBaker|\l|+ bakeBread(): void\l}"];
-    InventoryManager [label="{InventoryManager|\l|+ manageInventory(): void\l}"];
-    SupplyOrder      [label="{SupplyOrder|\l|+ orderSupplies(): void\l}"];
-    BakeryCleaner    [label="{BakeryCleaner|\l|+ cleanBakery(): void\l}"];
-
-    Main [shape=box, fillcolor="#ead1dc", label="Main\n+ main(args: String[]): void\n- readOrder(): CustomerOrder\n- readPaymentType(): String\n- readInt(...): int\n- readYesNo(...): String"];
-
-    CreditCardPaymentProcessor -> PaymentProcessor [arrowhead=onormal];
-    PayPalPaymentProcessor     -> PaymentProcessor [arrowhead=onormal];
-
-    PaymentProcessorFactory -> PaymentProcessor            [style=dashed, arrowhead=vee, label="«creates»"];
-    PaymentProcessorFactory -> CreditCardPaymentProcessor  [style=dashed, arrowhead=vee];
-    PaymentProcessorFactory -> PayPalPaymentProcessor      [style=dashed, arrowhead=vee];
-
-    CustomerOrderBuilder -> CustomerOrder [style=dashed, arrowhead=vee, label="«creates»"];
-
-    CustomerService -> PaymentProcessor [arrowhead=diamond, style=solid, label="has-a"];
-    CustomerService -> CustomerOrder    [arrowhead=vee,   style=solid, label="uses"];
-    CustomerOrder -> BakeryConfig       [style=dashed, arrowhead=vee, label="«uses»"];
-
-    Main -> CustomerService          [style=dotted, arrowhead=vee];
-    Main -> PaymentProcessorFactory  [style=dotted, arrowhead=vee];
-    Main -> CustomerOrderBuilder     [style=dotted, arrowhead=vee];
-    Main -> BakeryConfig             [style=dotted, arrowhead=vee];
-}
-```
-<img width="1447" height="488" alt="image" src="https://github.com/user-attachments/assets/409e9da9-6dc7-4b82-a941-7fcddfc132ab" />
-
-**Figure 1:** UML class diagram of the Bakery Management System (Lab 2).
-
-**Figure 1 — Legend:**
+**Legend — colors:**
 
 | Color | Pattern / role |
 |-------|----------------|
@@ -155,6 +105,8 @@ digraph BakeryUML {
 | Pink | Entry point (`Main`) |
 | Grey | Plain single-responsibility components |
 
+**Legend — arrows:**
+
 | Arrow | Meaning |
 |-------|---------|
 | Solid line, open triangle | Inheritance (`extends`) |
@@ -162,9 +114,47 @@ digraph BakeryUML {
 | Dashed line, open "vee" | Creates / uses |
 | Dotted line, open "vee" | Orchestration from `Main` |
 
-### 3.3 Design Rationale
+### 3.3 UML Diagram per Pattern
+
+Each pattern is shown in isolation below so the structure is unambiguous.
 
 #### 3.3.1 Singleton — `BakeryConfig`
+
+<img width="940" height="588" alt="image" src="https://github.com/user-attachments/assets/c0ee40c8-d1d5-409b-8ef8-3fdbcd5af976" />
+
+
+**Figure 2:** Singleton pattern — `BakeryConfig`.
+
+- `BakeryConfig` has a **private constructor** (not shown, implicit) and a `static` field `instance`.
+- `getInstance()` is `static` and `synchronized` — one global entry point, thread-safe.
+- Both `Main` and `CustomerOrder` read from it via `«uses»`.
+
+#### 3.3.2 Builder — `CustomerOrder` + `Builder`
+
+<img width="874" height="289" alt="image" src="https://github.com/user-attachments/assets/69b71e11-200d-43a0-b238-ff562af4ebb7" />
+
+
+**Figure 3:** Builder pattern — `CustomerOrder` + `CustomerOrder.Builder`.
+
+- `Builder` is a **static nested class** inside `CustomerOrder` (hence `CustomerOrder$Builder.class` at compile time).
+- Fluent methods (`addItem`, `discount`, `note`, `withDelivery`) return `Builder` (`return this`) — shown as the self-loop.
+- `build()` is the **only** way to create a `CustomerOrder` (its constructor is private).
+
+#### 3.3.3 Factory Method — `PaymentProcessorFactory`
+
+<img width="957" height="597" alt="image" src="https://github.com/user-attachments/assets/2dc6bc38-917f-4b87-9e43-633ad81aaa42" />
+
+
+**Figure 4:** Factory Method — `PaymentProcessorFactory`.
+
+- `PaymentProcessor` is the abstract base; the two concrete processors extend it.
+- `PaymentProcessorFactory.create(type)` is the **single place** that instantiates concrete processors.
+- It returns the abstraction `PaymentProcessor`, never a concrete class.
+- `CustomerService` depends on `PaymentProcessor` (has-a), not on the factory.
+
+### 3.4 Design Rationale
+
+#### 3.4.1 Singleton — `BakeryConfig`
 
 Bakery-wide settings (name, currency, tax rate) must be consistent everywhere they are read. If `CustomerOrder` computed tax from one value and a future reporting class from another, orders would silently disagree. The **Singleton** pattern guarantees one instance and one source of truth.
 
@@ -174,7 +164,7 @@ Key points:
 - Access is only through `getInstance()`, which is `synchronized` to be thread-safe.
 - All fields are `final` — the configuration is immutable after creation.
 
-#### 3.3.2 Builder — `CustomerOrder`
+#### 3.4.2 Builder — `CustomerOrder`
 
 An order may have any combination of items, discount, note, and delivery. A telescoping constructor would require many overloads; setters would leave the object mutable. The **Builder** pattern solves both with a fluent API and an immutable product.
 
@@ -184,9 +174,9 @@ Key points:
 - All product fields are `final`, so a built order cannot be modified.
 - The builder is a **static nested class**, keeping it close to its product.
 - Only `customerName` is required; everything else is optional.
-- In `Main`, each answer the user gives is applied to the builder via a fluent call (`addItem`, `discount`, `note`, `withDelivery`), and `.build()` is called once at the end — a clean separation between *collecting input* and *constructing the product*.
+- In `Main`, each answer the user gives is applied to the builder via a fluent call, and `.build()` is called once at the end.
 
-#### 3.3.3 Factory Method — `PaymentProcessorFactory`
+#### 3.4.3 Factory Method — `PaymentProcessorFactory`
 
 Instead of `new CreditCardPaymentProcessor()` and `new PayPalPaymentProcessor()` scattered across the codebase, creation is delegated to one factory.
 
@@ -195,13 +185,13 @@ Key points:
 - Callers (`Main`, `CustomerService`) never reference concrete processor classes — only the `PaymentProcessor` abstraction and the factory.
 - Adding a new payment method requires adding one `case` — the rest of the system is untouched.
 - Invalid types fail fast with a clear exception instead of returning `null`.
-- In `Main`, the payment type the user types is passed directly to `PaymentProcessorFactory.create(type)` — `Main` never names a concrete processor class.
+- In `Main`, the payment type the user types is passed directly to `PaymentProcessorFactory.create(type)`.
 
-#### 3.3.4 Supporting pattern — Strategy (from Lab 1)
+#### 3.4.4 Supporting pattern — Strategy (from Lab 1)
 
 `CustomerService` still depends only on the `PaymentProcessor` abstraction and receives a concrete processor via constructor injection. This is unchanged from Lab 1 and is what makes the factory's output usable: the factory decides *what* processor to create; `CustomerService` decides *when* to invoke it.
 
-### 3.4 Relationship to Laboratory Work #1
+### 3.5 Relationship to Laboratory Work #1
 
 Lab 2 does **not** discard Lab 1 — it builds on it. The table below shows what changed.
 
@@ -215,7 +205,7 @@ Lab 2 does **not** discard Lab 1 — it builds on it. The table below shows what
 | `BakeryConfig` | — | **New** (Singleton) |
 | `CustomerOrder` + `Builder` | — | **New** (Builder) |
 
-The SOLID principles from Lab 1 remain visible (SRP in the bakery roles, OCP via the factory, DIP in `CustomerService`), but they are now **implied** rather than the headline of the report.
+**Pattern count:** 3 new patterns in Lab 2 + 1 inherited from Lab 1 = **4 patterns total**.
 
 ---
 
@@ -223,16 +213,24 @@ The SOLID principles from Lab 1 remain visible (SRP in the bakery roles, OCP via
 
 ### 4.1 Project Structure
 
-The whole program is intentionally kept in a single `Main.java` file (Java 8 compatible) for a self-contained lab submission:
+The whole program is intentionally kept in a single `Main.java` file (Java 8 compatible):
 
 ```
 .
 ├── .gitignore
 ├── README.md
 ├── docs/
-│   ├── bakery-uml.dot        # Graphviz source for Figure 1
-│   └── bakery-uml.png        # Rendered UML diagram
-└── Main.java                 # Whole program, single-file Java 8 compatible
+│   ├── bakery-uml.dot            # Graphviz source — full diagram
+│   ├── bakery-uml.png
+│   ├── singleton-uml.dot         # Graphviz source — Singleton
+│   ├── singleton-uml.png
+│   ├── builder-uml.dot           # Graphviz source — Builder
+│   ├── builder-uml.png
+│   ├── factory-uml.dot           # Graphviz source — Factory Method
+│   ├── factory-uml.png
+│   ├── strategy-uml.dot          # Graphviz source — Strategy
+│   └── strategy-uml.png
+└── Main.java                     # Whole program, single-file Java 8 compatible
 ```
 
 ### 4.2 Source Code
@@ -473,19 +471,23 @@ public class Main {
 
 ### 4.3 Getting Started
 
-**Prerequisites:** JDK 8+, Graphviz (only to regenerate the diagram).
+**Prerequisites:** JDK 8+, Graphviz (only to regenerate the diagrams).
 
 ```bash
 javac --release 8 Main.java
 java Main
 ```
 
-The program is **interactive** — after launching it, follow the on-screen prompts to enter customer names, items, discount, note, delivery choice, and payment type. Input is validated: invalid numbers, empty names, or unknown payment types cause the program to re-ask instead of crashing.
+The program is **interactive** — after launching it, follow the on-screen prompts. Input is validated: invalid numbers, empty names, or unknown payment types cause the program to re-ask instead of crashing.
 
-Optional — regenerate the UML diagram:
+Regenerate all UML diagrams:
 
 ```bash
-dot -Tpng docs/bakery-uml.dot -o docs/bakery-uml.png
+dot -Tpng docs/bakery-uml.dot    -o docs/bakery-uml.png
+dot -Tpng docs/singleton-uml.dot -o docs/singleton-uml.png
+dot -Tpng docs/builder-uml.dot   -o docs/builder-uml.png
+dot -Tpng docs/factory-uml.dot   -o docs/factory-uml.png
+dot -Tpng docs/strategy-uml.dot  -o docs/strategy-uml.png
 ```
 
 ---
@@ -533,35 +535,32 @@ All orders processed. Have a nice day!
 
 ### 6.1 New payment method (Factory Method)
 
+Add one class and one `case` in the factory — nothing else changes:
+
 ```java
 class CryptoPaymentProcessor extends PaymentProcessor {
     @Override public void processPayment(double amount) {
         System.out.println("Processing crypto payment of $" + amount);
     }
 }
-// add to PaymentProcessorFactory.create(...):
-// case "crypto": return new CryptoPaymentProcessor();
+// inside PaymentProcessorFactory.create(...):
+// case "crypto":
+//     return new CryptoPaymentProcessor();
 ```
 
-Then the user can type `crypto` at the payment prompt — no other change needed. Only one new class + one `case`; everything else untouched.
+The user can then type `crypto` at the payment prompt — no other change needed.
 
 ### 6.2 New order attribute (Builder)
 
-```java
-// in CustomerOrder.Builder
-private boolean giftWrap = false;
-public Builder giftWrap() { this.giftWrap = true; return this; }
-```
-
-Existing callers compile and behave unchanged; new callers opt in fluently. In `Main`, add a `readYesNo("Gift wrap? (y/n): ")` question and call `builder.giftWrap()` if the answer is `y`.
+Add one field to `CustomerOrder`, one field to `Builder`, and one fluent setter. Existing callers are unaffected because the builder is append-only.
 
 ### 6.3 New bakery-wide setting (Singleton)
 
-Add a `final` field to `BakeryConfig`'s private constructor and a getter. Because all consumers go through `getInstance()`, they immediately see the new value without any code change on their side.
+Add a `final` field to `BakeryConfig`'s private constructor and a getter. Every consumer reads through `getInstance()` and immediately sees the new value.
 
 ### 6.4 New validation rule (input layer)
 
-Add a new helper method in `Main` (e.g. `readNonEmptyString(prompt)`) and call it wherever a non-empty string is required. The patterns are unaffected — this only touches the input layer.
+Add a new helper method in `Main` and call it wherever needed. The patterns are unaffected — this only touches the input layer.
 
 ---
 
@@ -573,11 +572,11 @@ Laboratory Work #2 extended the Lab 1 codebase with three design patterns, each 
 - **Builder** (`CustomerOrder` + `Builder`) — fluent construction of complex orders with only required fields, producing an immutable product.
 - **Factory Method** (`PaymentProcessorFactory`) — centralized, type-safe creation of payment processors; adding a new method touches one file.
 
-The **Strategy** pattern from Lab 1 is preserved and now complements the factory: the factory decides *what* to create, the injected abstraction decides *how* `CustomerService` uses it. Together the patterns keep the program open for extension while keeping each class small and testable.
+The **Strategy** pattern from Lab 1 is preserved and now complements the factory: the factory decides *what* to create, the injected abstraction decides *how* `CustomerService` uses it.
 
-Additionally, the program now accepts **interactive keyboard input** via `java.util.Scanner`, with validation loops (`while`) and exception handling (`try/catch` on `Integer.parseInt`) so that malformed input is rejected gracefully. This does not change the pattern structure — only `main()` and its helper methods — demonstrating that the design remains stable under changes to the entry point.
+Additionally, the program now accepts **interactive keyboard input** via `java.util.Scanner`, with validation loops and exception handling so that malformed input is rejected gracefully. This does not change the pattern structure — only `main()` and its helper methods.
 
-Comparing the two labs: Lab 1 taught *why* classes should be small and depend on abstractions (SOLID); Lab 2 shows *how* to instantiate and assemble those abstractions cleanly as the program grows (patterns) and how to feed them real, user-supplied data. Neither lab works as well without the other.
+**Final count: 3 new patterns + 1 inherited = 4 patterns.**
 
 ---
 
